@@ -32,6 +32,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.pc1_grupal.ui.theme.Pc1_GrupalTheme
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
@@ -44,43 +47,84 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Pc1_GrupalTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    BollfireAuthFlow(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(innerPadding)
-                    )
-                }
+                BollfireAppNavHost()
             }
         }
     }
 }
 
-enum class AuthScreen {
-    LOGIN,
-    REGISTER
-}
-
+/**
+ * Grafo de navegación principal con Navigation Compose.
+ * Rutas: "login", "register", "registro_jugada", "seguimiento"
+ */
 @Composable
-fun BollfireAuthFlow(modifier: Modifier = Modifier) {
-    var currentScreen by remember { mutableStateOf(AuthScreen.LOGIN) }
+fun BollfireAppNavHost() {
+    val navController = rememberNavController()
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val startDestination = if (currentUser != null) "registro_jugada" else "login"
 
-    when (currentScreen) {
-        AuthScreen.LOGIN -> BollfireLoginScreen(
-            modifier = modifier,
-            onNavigateToRegister = { currentScreen = AuthScreen.REGISTER }
-        )
-        AuthScreen.REGISTER -> BollfireRegisterScreen(
-            modifier = modifier,
-            onNavigateToLogin = { currentScreen = AuthScreen.LOGIN }
-        )
+    NavHost(
+        navController = navController,
+        startDestination = startDestination
+    ) {
+        // Ruta 1: Login
+        composable("login") {
+            BollfireLoginScreen(
+                onNavigateToRegister = {
+                    navController.navigate("register")
+                },
+                onLoginSuccess = {
+                    navController.navigate("registro_jugada") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // Ruta 2: Registro de cuenta
+        composable("register") {
+            BollfireRegisterScreen(
+                onNavigateToLogin = {
+                    navController.popBackStack()
+                },
+                onRegisterSuccess = {
+                    navController.navigate("registro_jugada") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // Ruta 3: Registro de Jugada (Sorteos y selección de 6 números)
+        composable("registro_jugada") {
+            RegistroJugadaScreen(
+                onNavegarSeguimiento = {
+                    navController.navigate("seguimiento")
+                },
+                onCerrarSesion = {
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        // Ruta 4: Seguimiento (Placeholder)
+        composable("seguimiento") {
+            SeguimientoPlaceholderScreen(
+                onVolver = {
+                    navController.popBackStack()
+                }
+            )
+        }
     }
 }
 
 @Composable
 fun BollfireLoginScreen(
     modifier: Modifier = Modifier,
-    onNavigateToRegister: () -> Unit
+    onNavigateToRegister: () -> Unit,
+    onLoginSuccess: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -130,7 +174,6 @@ fun BollfireLoginScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                // Título "Bollfire"
                 Text(
                     text = "🔥 Bollfire",
                     fontSize = 32.sp,
@@ -149,7 +192,6 @@ fun BollfireLoginScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Estado de Firebase
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = if (isFirebaseReady) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f),
@@ -166,7 +208,6 @@ fun BollfireLoginScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Campo Correo Electrónico
                 OutlinedTextField(
                     value = email,
                     onValueChange = {
@@ -189,7 +230,6 @@ fun BollfireLoginScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Campo Contraseña
                 OutlinedTextField(
                     value = password,
                     onValueChange = {
@@ -221,7 +261,6 @@ fun BollfireLoginScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Mensaje de estado/error
                 statusMessage?.let { msg ->
                     Text(
                         text = msg,
@@ -234,7 +273,6 @@ fun BollfireLoginScreen(
                     )
                 }
 
-                // Botón Ingresar
                 Button(
                     onClick = {
                         if (email.isBlank() || password.isBlank()) {
@@ -250,7 +288,8 @@ fun BollfireLoginScreen(
                             isLoading = false
                             statusMessage = "Firebase aún no está configurado. Modo demo para '$email'."
                             isError = false
-                            Toast.makeText(context, "Modo Demo: Intento de ingreso con $email", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "Modo Demo: Ingresando...", Toast.LENGTH_SHORT).show()
+                            onLoginSuccess()
                         } else {
                             try {
                                 val auth = FirebaseAuth.getInstance()
@@ -258,10 +297,9 @@ fun BollfireLoginScreen(
                                     .addOnCompleteListener { task ->
                                         isLoading = false
                                         if (task.isSuccessful) {
-                                            val user = auth.currentUser
                                             isError = false
-                                            statusMessage = "¡Bienvenido ${user?.displayName ?: user?.email ?: ""}!"
                                             Toast.makeText(context, "Inicio de sesión exitoso", Toast.LENGTH_SHORT).show()
+                                            onLoginSuccess()
                                         } else {
                                             isError = true
                                             statusMessage = task.exception?.localizedMessage ?: "Error al autenticar"
@@ -297,7 +335,6 @@ fun BollfireLoginScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Texto "¿No tienes una cuenta? Regístrate"
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
@@ -324,7 +361,8 @@ fun BollfireLoginScreen(
 @Composable
 fun BollfireRegisterScreen(
     modifier: Modifier = Modifier,
-    onNavigateToLogin: () -> Unit
+    onNavigateToLogin: () -> Unit,
+    onRegisterSuccess: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -394,7 +432,6 @@ fun BollfireRegisterScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Campo Nombre
                 OutlinedTextField(
                     value = nombre,
                     onValueChange = {
@@ -416,7 +453,6 @@ fun BollfireRegisterScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Campo Apellido
                 OutlinedTextField(
                     value = apellido,
                     onValueChange = {
@@ -438,7 +474,6 @@ fun BollfireRegisterScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Campo Correo Electrónico
                 OutlinedTextField(
                     value = email,
                     onValueChange = {
@@ -461,7 +496,6 @@ fun BollfireRegisterScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // Campo Contraseña
                 OutlinedTextField(
                     value = password,
                     onValueChange = {
@@ -493,7 +527,6 @@ fun BollfireRegisterScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Mensaje de estado/error
                 statusMessage?.let { msg ->
                     Text(
                         text = msg,
@@ -506,7 +539,6 @@ fun BollfireRegisterScreen(
                     )
                 }
 
-                // Botón Registrarse
                 Button(
                     onClick = {
                         if (nombre.isBlank() || apellido.isBlank() || email.isBlank() || password.isBlank()) {
@@ -529,6 +561,7 @@ fun BollfireRegisterScreen(
                             statusMessage = "Firebase aún no está configurado. Registro simulado para '$nombre $apellido'."
                             isError = false
                             Toast.makeText(context, "Registro simulado exitoso", Toast.LENGTH_SHORT).show()
+                            onRegisterSuccess()
                         } else {
                             try {
                                 val auth = FirebaseAuth.getInstance()
@@ -545,7 +578,6 @@ fun BollfireRegisterScreen(
                                             }
                                             firebaseUser?.updateProfile(profileUpdates)
 
-                                            // Guardar datos adicionales en Firestore (colección 'users')
                                             val userData = hashMapOf(
                                                 "uid" to uid,
                                                 "nombre" to nombre.trim(),
@@ -561,7 +593,7 @@ fun BollfireRegisterScreen(
                                                     isLoading = false
                                                     isError = false
                                                     Toast.makeText(context, "¡Cuenta creada exitosamente!", Toast.LENGTH_SHORT).show()
-                                                    onNavigateToLogin()
+                                                    onRegisterSuccess()
                                                 }
                                                 .addOnFailureListener { e ->
                                                     isLoading = false
@@ -604,7 +636,6 @@ fun BollfireRegisterScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Texto "¿Ya tienes una cuenta? Inicia sesión"
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
@@ -632,6 +663,6 @@ fun BollfireRegisterScreen(
 @Composable
 fun BollfireAuthPreview() {
     Pc1_GrupalTheme {
-        BollfireAuthFlow()
+        BollfireLoginScreen(onNavigateToRegister = {})
     }
 }
