@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "971704633025",
+    "project_id": "pc1jalv",
+    "storage_bucket": "pc1jalv.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:971704633025:android:86e6616afbb7d7725bf640",
+        "android_client_info": {
+          "package_name": "com.example.pc1_grupal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBenGlxkgUD8Rgj6WIr6qjsy8XY6LmbG8A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
