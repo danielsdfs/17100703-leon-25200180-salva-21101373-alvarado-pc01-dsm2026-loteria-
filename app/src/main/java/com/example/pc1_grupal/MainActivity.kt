@@ -569,15 +569,18 @@ fun BollfireRegisterScreen(
 
                                 auth.createUserWithEmailAndPassword(email.trim(), password)
                                     .addOnCompleteListener { task ->
+                                        isLoading = false
                                         if (task.isSuccessful) {
                                             val firebaseUser = auth.currentUser
                                             val uid = firebaseUser?.uid ?: ""
 
+                                            // Actualizar nombre en el perfil del usuario
                                             val profileUpdates = userProfileChangeRequest {
                                                 displayName = "${nombre.trim()} ${apellido.trim()}"
                                             }
                                             firebaseUser?.updateProfile(profileUpdates)
 
+                                            // Guardar datos en la colección 'users' de Firestore
                                             val userData = hashMapOf(
                                                 "uid" to uid,
                                                 "nombre" to nombre.trim(),
@@ -585,23 +588,11 @@ fun BollfireRegisterScreen(
                                                 "email" to email.trim(),
                                                 "fechaRegistro" to System.currentTimeMillis()
                                             )
+                                            firestore.collection("users").document(uid).set(userData)
 
-                                            firestore.collection("users")
-                                                .document(uid)
-                                                .set(userData)
-                                                .addOnSuccessListener {
-                                                    isLoading = false
-                                                    isError = false
-                                                    Toast.makeText(context, "¡Cuenta creada exitosamente!", Toast.LENGTH_SHORT).show()
-                                                    onRegisterSuccess()
-                                                }
-                                                .addOnFailureListener { e ->
-                                                    isLoading = false
-                                                    isError = true
-                                                    statusMessage = "Usuario creado, pero hubo un detalle en Firestore: ${e.localizedMessage}"
-                                                }
+                                            Toast.makeText(context, "¡Cuenta creada exitosamente!", Toast.LENGTH_SHORT).show()
+                                            onRegisterSuccess()
                                         } else {
-                                            isLoading = false
                                             isError = true
                                             statusMessage = task.exception?.localizedMessage ?: "Error al crear la cuenta"
                                         }
